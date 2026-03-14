@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Result Management</span>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="result-card text-center">
+            <h2>{{ student[1] }}</h2>
+            <p class="lead">Roll No: {{ student[2] }} | Class: {{ student[8] }}</p>
+        </div>
+
+        {% if results %}
+        <div class="card">
+            <div class="card-header">
+                <h4>Subject-wise Marks</h4>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Marks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td>{{ result[0] }}</td>
+                            <td><strong>{{ result[1] }}/100</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <div class="row text-center mt-4">
+                    <div class="col-md-6">
+                        <h5>Total Marks: {{ total_marks }} / {{ results|length * 100 }}</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Percentage: <span class="text-success">{{ "%.2f"|format(percentage) }}%</span></h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('download_pdf') }}" class="download-btn">📄 Download PDF Report Card</a>
+        </div>
+        {% else %}
+        <div class="alert alert-info text-center">
+            No marks entered yet!
+        </div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('student_login') }}" class="btn btn-outline-primary">← Back to Login</a>
+        </div>
+    </div>
+</body>
+</html>
