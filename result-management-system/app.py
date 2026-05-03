@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3
 
 app = Flask(__name__)
@@ -26,6 +26,8 @@ def admin_login():
         if username == "admin" and password == "admin":
             session['admin'] = True
             return redirect('/admin/dashboard')
+        else:
+            flash("Invalid Username or Password")
 
     return render_template('admin_login.html')
 
@@ -41,13 +43,18 @@ def admin_dashboard():
 # ---------- ADD CLASS ----------
 @app.route('/admin/add_class', methods=['GET', 'POST'])
 def add_class():
+    if 'admin' not in session:
+        return redirect('/admin/login')
+
     if request.method == 'POST':
         name = request.form['class_name']
+
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("INSERT INTO classes (name) VALUES (?)", (name,))
         conn.commit()
         conn.close()
+
         return redirect('/admin/dashboard')
 
     return render_template('add_class.html')
@@ -56,6 +63,9 @@ def add_class():
 # ---------- ADD STUDENT ----------
 @app.route('/admin/add_student', methods=['GET', 'POST'])
 def add_student():
+    if 'admin' not in session:
+        return redirect('/admin/login')
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -64,8 +74,11 @@ def add_student():
         roll = request.form['roll_no']
         class_id = request.form['class_id']
 
-        cursor.execute("INSERT INTO students (name, roll_no, class_id) VALUES (?, ?, ?)",
-                       (name, roll, class_id))
+        cursor.execute("""
+            INSERT INTO students (name, roll_no, class_id)
+            VALUES (?, ?, ?)
+        """, (name, roll, class_id))
+
         conn.commit()
         conn.close()
         return redirect('/admin/dashboard')
@@ -80,6 +93,9 @@ def add_student():
 # ---------- ADD SUBJECT ----------
 @app.route('/admin/add_subject', methods=['GET', 'POST'])
 def add_subject():
+    if 'admin' not in session:
+        return redirect('/admin/login')
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -87,8 +103,11 @@ def add_subject():
         name = request.form['subject_name']
         class_id = request.form['class_id']
 
-        cursor.execute("INSERT INTO subjects (name, class_id) VALUES (?, ?)",
-                       (name, class_id))
+        cursor.execute("""
+            INSERT INTO subjects (name, class_id)
+            VALUES (?, ?)
+        """, (name, class_id))
+
         conn.commit()
         conn.close()
         return redirect('/admin/dashboard')
@@ -103,6 +122,9 @@ def add_subject():
 # ---------- ADD MARKS ----------
 @app.route('/admin/add_marks', methods=['GET', 'POST'])
 def add_marks():
+    if 'admin' not in session:
+        return redirect('/admin/login')
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -111,8 +133,23 @@ def add_marks():
         subject_id = request.form['subject_id']
         marks = request.form['marks']
 
-        cursor.execute("INSERT INTO marks (student_id, subject_id, marks) VALUES (?, ?, ?)",
-                       (student_id, subject_id, marks))
+        # Prevent duplicate marks
+        cursor.execute("""
+            SELECT * FROM marks WHERE student_id=? AND subject_id=?
+        """, (student_id, subject_id))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("""
+                UPDATE marks SET marks=? WHERE student_id=? AND subject_id=?
+            """, (marks, student_id, subject_id))
+        else:
+            cursor.execute("""
+                INSERT INTO marks (student_id, subject_id, marks)
+                VALUES (?, ?, ?)
+            """, (student_id, subject_id, marks))
+
         conn.commit()
         conn.close()
         return redirect('/admin/dashboard')
@@ -143,6 +180,8 @@ def student_login():
         if student:
             session['student_id'] = student[0]
             return redirect('/result')
+        else:
+            flash("Invalid Roll Number")
 
     return render_template('student_login.html')
 
@@ -156,6 +195,11 @@ def result():
     conn = get_db()
     cursor = conn.cursor()
 
+    # Student info
+    cursor.execute("SELECT * FROM students WHERE id=?", (session['student_id'],))
+    student = cursor.fetchone()
+
+    # Marks + subjects
     cursor.execute("""
         SELECT subjects.name, marks.marks
         FROM marks
@@ -164,9 +208,20 @@ def result():
     """, (session['student_id'],))
 
     results = cursor.fetchall()
+
+    # Calculate total & percentage
+    total_marks = sum([r[1] for r in results]) if results else 0
+    percentage = (total_marks / (len(results) * 100) * 100) if results else 0
+
     conn.close()
 
-    return render_template('result.html', results=results)
+    return render_template(
+        'result.html',
+        student=student,
+        results=results,
+        total_marks=total_marks,
+        percentage=percentage
+    )
 
 
 # ---------- LOGOUT ----------
